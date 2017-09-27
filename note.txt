@@ -1,0 +1,206 @@
+6. 从数据库中获取资源信息:
+
+自定义 SecurityMetadataSource 接口的实现类, 
+将该类的实例装配给 FilterSecurityInterceptor 的 securityMetadataSource 的属性.即可实现自定义的资源获取.
+
+2). 如何把 1) 的 Bean 装配给 FilterSecurityInterceptor 的 securityMetadataSource 的属性
+
+①. 利用 ServletContextListener, 注意, 该 Listener 需要在 ContextLoaderListener 之后
+
+<!-- 配置启动 SpringIOC 容器的 Listener -->
+<listener>
+	<listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+</listener>
+
+<listener>
+	<listener-class>com.atguigu.springsecurity.listeners.SpringSecurityListener</listener-class>
+</listener>
+
+②. 在 Listener 的 contextInitialized 方法中:
+
+//1. 得到 Spring 的 IOC 容器
+ApplicationContext ctx = 
+		WebApplicationContextUtils.getRequiredWebApplicationContext(sce.getServletContext());
+
+//2. 从 IOC 容器中取出 FilterSecurityInterceptor 对象
+FilterSecurityInterceptor filterSecurityInterceptor = 
+		ctx.getBean(FilterSecurityInterceptor.class); 
+
+//3. 从 IOC 容器中取出 securityMetadataSource
+FilterInvocationSecurityMetadataSource newSource = 
+		(FilterInvocationSecurityMetadataSource) ctx.getBean("securityMetadataSource");
+
+//4. 调用 2 的 setSecurityMetadataSource 方法, 参数为 3
+filterSecurityInterceptor.setSecurityMetadataSource(newSource);
+
+1). 需要借助于 FactoryBean 来装配 SecurityMetadataSource 的实现类 FilterInvocationSecurityMetadataSource
+
+public class FilterInvocationSecurityMetadataSourceBean implements
+		FactoryBean<FilterInvocationSecurityMetadataSource> {
+
+	//返回实际的对象
+	@Override
+	public FilterInvocationSecurityMetadataSource getObject() throws Exception {
+		//....
+		return filterInvocationSecurityMetadataSource;
+	}
+
+	//实际返回的 Bean 的类型
+	@Override
+	public Class<?> getObjectType() {
+		return FilterInvocationSecurityMetadataSource.class;
+	}
+
+	//返回的 Bean 对象是否为单例
+	@Override
+	public boolean isSingleton() {
+		return true;
+	}
+
+}
+
+<!-- 
+实际的 Bean 并非 FilterInvocationSecurityMetadataSourceBean 类型, 
+而是 FilterInvocationSecurityMetadataSourceBean 的  getType() 方法返回的类型, 
+实际的 Bean 对象为 getObject() 返回的对象
+-->
+<bean id="securityMetadataSource" 
+	class="com.atguigu.springsecurity.impl.FilterInvocationSecurityMetadataSourceBean"></bean>
+
+5. 从数据库中获取用户信息:
+
+自定义 UserDetailsService 接口的实现类, 将该类配置到 Spring 的 IOC 容器中: 
+在 <authentication-provider user-service-ref=""> 节点的 user-service-ref 属性中引用该 Bean. 
+即可实现自定义的登录.
+
+<!-- 自实现的 UserDetailsService 的实现类 -->
+<bean id="userDetailsService" 
+	class="com.atguigu.springsecurity.impl.UserDetailsServiceImpl"></bean>
+ 
+<security:authentication-manager>
+	<!-- user-service-ref 执行UserDetailsService 的实现类 Bean  -->
+	<security:authentication-provider user-service-ref="userDetailsService"/>
+</security:authentication-manager>
+
+
+public class UserDetailsServiceImpl implements UserDetailsService {
+
+	@Override
+	public UserDetails loadUserByUsername(String username)
+			throws UsernameNotFoundException {
+		User user = null;
+		
+		//密码
+		String password = "1230";
+		//账户是否可用
+		boolean enabled = true;
+		//账户是否没过期
+		boolean accountNonExpired = true;
+		//凭证是否没有过期
+		boolean credentialsNonExpired = true;
+		
+		//账号是否没有被锁定
+		boolean accountNonLocked = true;
+		//用户所具有的权限信息的集合, 该集合中存放 GrantedAuthorityImpl 类的对象即可
+		//GrantedAuthorityImpl 只有 role 这一个属性, 该属性类似于为 ROLE_ADMIN 
+		Collection<GrantedAuthority> authorities = new HashSet<>();
+		authorities.add(new GrantedAuthorityImpl("ROLE_ADMIN"));
+		authorities.add(new GrantedAuthorityImpl("ROLE_USER"));
+		
+		//创建 User 对象, User 类是 UserDetails 的实现类
+		user = new User(username, password, enabled, accountNonExpired, 
+				credentialsNonExpired, accountNonLocked, authorities);
+		
+		return user;
+	}
+
+}
+
+4. 配置登录页面
+
+<!-- 配置登录的表单页面 -->
+<security:form-login 
+	login-page="/login.jsp"
+	password-parameter="password"
+	username-parameter="username"
+	default-target-url="/index.jsp"
+	always-use-default-target="true"
+	authentication-failure-url="/failure.jsp"
+	login-processing-url="/springsecuritylogin" />
+
+3. 配置登出功能:
+
+<security:logout logout-url="/logout"
+			logout-success-url="/index.jsp"
+			invalidate-session="true"/>
+
+2. 使用 SpringSecurity 标签隐藏没有访问权限的 URL
+
+<security:authorize ifAllGranted="ROLE_ADMIN">
+	<a href="admin.jsp">To Admin Page</a>
+</security:authorize>
+
+1. SpringSecurity 的 helloworld:
+
+1). 加入 jar 包:
+
+commons-logging-1.1.1.jar
+
+org.springframework.aop-3.1.1.RELEASE.jar
+org.springframework.asm-3.1.1.RELEASE.jar
+org.springframework.beans-3.1.1.RELEASE.jar
+org.springframework.context-3.1.1.RELEASE.jar
+org.springframework.context.support-3.1.1.RELEASE.jar
+org.springframework.core-3.1.1.RELEASE.jar
+org.springframework.expression-3.1.1.RELEASE.jar
+org.springframework.web-3.1.1.RELEASE.jar
+
+spring-security-acl-3.1.0.M1.jar
+spring-security-config-3.1.0.M1.jar
+spring-security-core-3.1.0.M1.jar
+spring-security-taglibs-3.1.0.M1.jar
+spring-security-web-3.1.0.M1.jar
+
+2). 配置 WEB 应用的 web.xml 文件
+
+<!-- 配置 Spring 配置文件的位置 -->
+<context-param>
+    <param-name>contextConfigLocation</param-name>
+    <param-value>classpath:springsecurity.xml</param-value>
+</context-param>
+
+
+<!-- 配置启动 SpringIOC 容器的 Listener -->
+<listener>
+    <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+</listener>
+
+<!-- 配置 SpringSecurity 的 Filter -->
+<filter>
+    <filter-name>springSecurityFilterChain</filter-name>
+    <filter-class>org.springframework.web.filter.DelegatingFilterProxy</filter-class>
+</filter>
+
+<filter-mapping>
+  <filter-name>springSecurityFilterChain</filter-name>
+  <url-pattern>/*</url-pattern>
+</filter-mapping>
+
+3). 编写 Spring Security 的配置文件
+
+<!-- 配置需要拦截的 URL, 以及访问这些 URL 需要具备哪些权限 -->
+<security:http auto-config="true">
+	<security:intercept-url pattern="/index.jsp" access="ROLE_USER"/>
+	<security:intercept-url pattern="/admin.jsp" access="ROLE_ADMIN"/>
+</security:http>
+
+<!-- 配置用户的基本信息: 用户名, 密码, 用户具备的权限 -->
+<security:authentication-manager>
+	<security:authentication-provider>
+		<security:user-service>
+			<security:user name="admin" password="admin" authorities="ROLE_USER, ROLE_ADMIN"/>
+			<security:user name="user" password="user" authorities="ROLE_USER"/>
+		</security:user-service>
+	</security:authentication-provider>
+</security:authentication-manager>
+

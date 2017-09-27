@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:security="http://www.springframework.org/schema/security"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-3.2.xsd">
+
+	<security:http auto-config="true">
+		<!-- <security:intercept-url pattern="/index.jsp"
+			access="ROLE_USER" />
+		<security:intercept-url pattern="/admin.jsp"
+			access="ROLE_ADMIN" /> -->
+
+		<!-- 配置登出 -->
+		<security:logout logout-url="/logout"
+			logout-success-url="/login.jsp" invalidate-session="true" />
+
+		<!-- 配置登录的表单页 -->
+		<security:form-login 
+			login-page="/login.jsp" 
+			password-parameter="password"
+			username-parameter="username"	
+			default-target-url="/index.jsp"
+			always-use-default-target="true"
+			authentication-failure-url="/failure.jsp"
+			login-processing-url="/spingsecuritylogin"
+			/>
+	</security:http>
+	
+	<bean id="userDetailsService" class="springsecurity001.UserDetailServiceImpl">
+		<property name="jdbcTemplate" ref="jdbcTemplate"></property>
+	</bean>
+
+	<security:authentication-manager>
+		<security:authentication-provider user-service-ref="userDetailsService">
+			<!-- <security:user-service>
+				<security:user name="admin" password="admin" authorities="ROLE_USER, ROLE_ADMIN" />
+				<security:user name="user" password="user" authorities="ROLE_USER" />
+			</security:user-service> -->
+		</security:authentication-provider>
+	</security:authentication-manager>
+	
+	<bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource">
+		<property name="username" value="root"/>
+		<property name="password" value="123456"/>
+		<property name="url" value="jdbc:mysql:///springsecurity"/>
+		<property name="driverClassName" value="com.mysql.jdbc.Driver"></property>
+	</bean>
+	
+	<bean id="jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
+		<property name="dataSource" ref="dataSource"></property>
+	</bean>
+	
+	<!-- 该类实现了FactoryBean接口，实例化的对象为，该类中getObjectType返回的类型 -->
+	<bean id="filterInvocationSecurityMetadataSourceBean" class="springsecurity001.FilterInvocationSecurityMetadataSourceBean"/>
+</beans>
